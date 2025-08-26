@@ -8,7 +8,8 @@
  */
 
 const properties = require('properties')
-const requestPromise = require('request-promise')
+// Native fetch is available in Node.js v18+
+/* global fetch */
 const Promise = require('promise')
 const Utils = require('./utils.js')
 
@@ -130,20 +131,25 @@ class BitcoinNode {
      */
   callRPC (params) {
     const options = {
-      url: this.urlString,
       method: 'POST',
       headers: {
         Accept: 'application/json',
         Authorization: 'Basic ' + this.authString,
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/json'
       },
-      json: true,
       body: JSON.stringify(params)
     }
-    return requestPromise(options)
+
+    return fetch(this.urlString, options)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        return response.json()
+      })
       .then(body => {
       // console.log('body ', body);
-        if (body.length === 0) {
+        if (!body || (Array.isArray(body) && body.length === 0)) {
           console.error('RPC response error body ')
           throw new Error('RPC response error body ')
         }

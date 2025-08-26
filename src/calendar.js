@@ -7,7 +7,8 @@
  * @license LPGL3
  */
 
-const requestPromise = require('request-promise')
+// Native fetch is available in Node.js v18+
+/* global fetch, AbortController */
 const minimatch = require('minimatch')
 require('./extend-error.js')
 if (URL === undefined) {
@@ -61,25 +62,42 @@ class RemoteCalendar {
    * and {@link reject} if rejected.
    */
   submit (digest) {
+    const url = new URL('/digest', this.url)
+    const controller = new AbortController()
+    const timeoutId = this.timeout ? setTimeout(() => controller.abort(), this.timeout) : null
+
     const options = {
-      url: new URL('/digest', this.url),
       method: 'POST',
       headers: this.headers,
-      timeout: this.timeout,
-      encoding: null,
-      body: Buffer.from(digest)
+      body: Buffer.from(digest),
+      signal: controller.signal
     }
 
-    return requestPromise(options)
-      .then(body => {
-        if (body.size > 10000) {
+    return fetch(url, options)
+      .then(response => {
+        if (timeoutId) clearTimeout(timeoutId)
+        if (!response.ok) {
+          throw new URLError(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        return response.arrayBuffer()
+      })
+      .then(arrayBuffer => {
+        const body = Buffer.from(arrayBuffer)
+        if (body.length > 10000) {
           throw new ExceededSizeError('Calendar response exceeded size limit')
         }
         const ctx = new Context.StreamDeserialization(body)
         const timestamp = Timestamp.deserialize(ctx, digest)
         return timestamp
       }).catch(err => {
-        throw new URLError(err.error.toString())
+        if (timeoutId) clearTimeout(timeoutId)
+        if (err.name === 'AbortError') {
+          throw new URLError('Request timeout')
+        }
+        if (err instanceof ExceededSizeError || err instanceof URLError) {
+          throw err
+        }
+        throw new URLError(err.message || err.toString())
       })
   }
 
@@ -90,27 +108,44 @@ class RemoteCalendar {
    * and {@link reject} if rejected.
    */
   getTimestamp (commitment) {
+    const url = new URL('/timestamp/' + Utils.bytesToHex(commitment), this.url)
+    const controller = new AbortController()
+    const timeoutId = this.timeout ? setTimeout(() => controller.abort(), this.timeout) : null
+
     const options = {
-      url: new URL('/timestamp/' + Utils.bytesToHex(commitment), this.url),
       method: 'GET',
       headers: this.headers,
-      timeout: this.timeout,
-      encoding: null
+      signal: controller.signal
     }
 
-    return requestPromise(options)
-      .then(body => {
-        if (body.size > 10000) {
+    return fetch(url, options)
+      .then(response => {
+        if (timeoutId) clearTimeout(timeoutId)
+        if (response.status === 404) {
+          throw new CommitmentNotFoundError('Commitment not found')
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        return response.arrayBuffer()
+      })
+      .then(arrayBuffer => {
+        const body = Buffer.from(arrayBuffer)
+        if (body.length > 10000) {
           throw new ExceededSizeError('Calendar response exceeded size limit')
         }
         const ctx = new Context.StreamDeserialization(body)
         const timestamp = Timestamp.deserialize(ctx, commitment)
         return timestamp
       }).catch(err => {
-        if (err.statusCode === 404) {
-          throw new CommitmentNotFoundError(err.error.toString())
+        if (timeoutId) clearTimeout(timeoutId)
+        if (err.name === 'AbortError') {
+          throw new Error('Request timeout')
         }
-        throw new Error(err.error.toString())
+        if (err instanceof CommitmentNotFoundError || err instanceof ExceededSizeError) {
+          throw err
+        }
+        throw new Error(err.message || err.toString())
       })
   }
 }

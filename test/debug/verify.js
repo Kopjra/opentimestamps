@@ -1,6 +1,20 @@
 
 const test = require('tape')
-const rp = require('request-promise')
+// Native fetch is available in Node.js v18+
+/* global fetch */
+// Utility function to mimic request-promise behavior
+const rp = (options) => {
+  return fetch(options.url)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      if (options.encoding === null) {
+        return response.arrayBuffer().then(buffer => Buffer.from(buffer))
+      }
+      return response.text()
+    })
+}
 const Utils = require('../../src/utils.js')
 const OpenTimestamps = require('../../src/open-timestamps.js')
 const DetachedTimestampFile = require('../../src/detached-timestamp-file.js')
