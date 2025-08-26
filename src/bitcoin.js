@@ -10,7 +10,6 @@
 const properties = require('properties')
 // Native fetch is available in Node.js v18+
 /* global fetch */
-const Promise = require('promise')
 const Utils = require('./utils.js')
 
 /** Class representing Bitcoin Header Interface */

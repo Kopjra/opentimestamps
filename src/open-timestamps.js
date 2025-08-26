@@ -7,7 +7,6 @@
  * @license LPGL3
  */
 
-const Promise = require('promise')
 const Context = require('./context.js')
 const DetachedTimestampFile = require('./detached-timestamp-file.js')
 const Timestamp = require('./timestamp.js')
