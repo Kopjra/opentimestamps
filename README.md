@@ -1,5 +1,11 @@
+# Fork
 
-# javascript-opentimestamps
+This repository is a fork of the original opentimestamps repository.
+
+This fork aims to provide an up-to-date version of the original repository, for security purposes.
+Only production dependencies have been updated, development dependencies have been left untouched.
+
+# opentimestamps
 
 [![OpenTimestamps logo][2]][1]
 
